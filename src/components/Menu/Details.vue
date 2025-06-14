@@ -1,4 +1,6 @@
 <script>
+import { useCollaboratorsStore } from '@/stores/collaborators';
+import { useCheckerStore } from '@/stores/configChecker';
 export default {
     data() {
         return {
@@ -15,6 +17,33 @@ export default {
                 element.countDescriptors = element.descriptors.length;
             }
         });
+    },
+    setup() {
+        const collaboratorsStore = useCollaboratorsStore();
+        const checkerStore = useCheckerStore();
+        return { collaboratorsStore, checkerStore };
+    },
+    methods: {
+        async getCollaborators() {
+            try {
+                const data = {};
+                data.checker_id = this.infoChecker.info.id;
+                data.key = this.infoChecker.info.key;
+                const response = await axios.post(import.meta.env.VITE_BACKEND_CHECKER_URL + 'checkers/valid', data);
+                if (response.data.status === true) {
+                    const fecha = new Date().toLocaleDateString('en-MX', { timeZone: 'America/Mexico_City' });
+                    const hora = new Date().toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour12: false });
+                    response.data.infoChecker.update = fecha + " " + hora;
+                    this.checkerStore.infoChecker(response.data.infoChecker);
+
+                    this.collaboratorsStore.infoStorage(response.data.data);
+                } else {
+                    this.settings.alert = { status: true, message: response.data.message };
+                }
+            } catch (error) {
+
+            }
+        }
     },
 }
 </script>
@@ -36,6 +65,9 @@ export default {
         <v-col cols="6" md="4">
             <strong>Colaboradores asociados</strong>
             <p v-if="infoCollaborators">{{ lengthCollaborators }}</p>
+        </v-col>
+        <v-col cols="12">
+            <v-btn append-icon="refresh" color="grey" block @click="getCollaborators">Recargar información</v-btn>
         </v-col>
     </v-row>
 </template>

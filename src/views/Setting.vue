@@ -1,6 +1,7 @@
 <script>
 import { useCollaboratorsStore } from '@/stores/collaborators';
 import { useCheckerStore } from '@/stores/configChecker';
+import * as faceapi from 'face-api.js';
 export default {
     data() {
         return {
@@ -44,10 +45,11 @@ export default {
                 if (errors.errors.length === 0) {
                     const response = await axios.post(import.meta.env.VITE_BACKEND_CHECKER_URL + 'checkers/valid', this.layout);
                     if (response.data.status === true) {
-                        const fecha = new Date().toLocaleDateString('en-US', { timeZone: 'America/Mexico_City' });
+                        const fecha = new Date().toLocaleDateString('en-MX', { timeZone: 'America/Mexico_City' });
                         const hora = new Date().toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour12: false });
                         response.data.infoChecker.update = fecha + " " + hora;
                         this.checkerStore.infoChecker(response.data.infoChecker);
+
                         this.collaboratorsStore.infoStorage(response.data.data);
                         this.$router.push("/scanner")
                     } else {
@@ -73,7 +75,7 @@ export default {
         <v-card-title class="pb-0">
             <v-row class="py-0 mt-6 mb-0">
                 <v-col cols="12">
-                    <v-img :width="$vuetify.display.width < 960 ? 300 : 500" src="/public/img/logo-pinturas-acuario.png"
+                    <v-img :width="$vuetify.display.width < 960 ? 300 : 500" src="/img/logo-pinturas-acuario.png"
                         style="margin: 0px auto;"></v-img>
                 </v-col>
                 <v-col cols="12">
@@ -83,7 +85,7 @@ export default {
                                 instalación</h4>
                         </v-col>
                         <v-col cols="4">
-                            <v-img src="/public/img/camera.gif"></v-img>
+                            <v-img src="/img/camera.gif" :width="$vuetify.display.width < 960 ? 50 : 100"></v-img>
                         </v-col>
                     </v-row>
                 </v-col>

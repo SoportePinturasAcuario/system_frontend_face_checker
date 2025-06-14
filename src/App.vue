@@ -12,9 +12,9 @@ export default {
     <v-row>
       <v-col class="d-flex justify-center align-center">
         <v-card :height="$vuetify.display.height * .9"
-          :width="$vuetify.display.width < 1280 ? $vuetify.display.width * .80 : $vuetify.display.width * .42"
-          elevation="2" class="rounded-xl">
-          <v-card-text>
+          :width="$vuetify.display.width < 1220 ? $vuetify.display.width * .80 : $vuetify.display.width * .50"
+          elevation="3" class="rounded-xl">
+          <v-card-text class="pa-0" style="height: 100%;">
             <RouterView />
           </v-card-text>
         </v-card>
