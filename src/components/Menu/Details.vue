@@ -1,6 +1,7 @@
 <script>
 import { useCollaboratorsStore } from '@/stores/collaborators';
 import { useCheckerStore } from '@/stores/configChecker';
+import { useLogsStore } from '@/stores/logs';
 export default {
     data() {
         return {
@@ -8,6 +9,7 @@ export default {
             infoCollaborators: JSON.parse(localStorage.collaborators),
             lengthCollaborators: null,
             internet: navigator.onLine,
+            error: {},
         }
     },
     created() {
@@ -21,7 +23,8 @@ export default {
     setup() {
         const collaboratorsStore = useCollaboratorsStore();
         const checkerStore = useCheckerStore();
-        return { collaboratorsStore, checkerStore };
+        const logsStore = useLogsStore();
+        return { collaboratorsStore, checkerStore, logsStore };
     },
     methods: {
         async getCollaborators() {
@@ -30,18 +33,17 @@ export default {
                 data.checker_id = this.infoChecker.info.id;
                 data.key = this.infoChecker.info.key;
                 const response = await axios.post(import.meta.env.VITE_BACKEND_CHECKER_URL + 'checkers/valid', data);
-                if (response.data.status === true) {
-                    const fecha = new Date().toLocaleDateString('en-MX', { timeZone: 'America/Mexico_City' });
-                    const hora = new Date().toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour12: false });
-                    response.data.infoChecker.update = fecha + " " + hora;
-                    this.checkerStore.infoChecker(response.data.infoChecker);
-
-                    this.collaboratorsStore.infoStorage(response.data.data);
-                } else {
-                    this.settings.alert = { status: true, message: response.data.message };
-                }
+                const fecha = new Date().toLocaleDateString('en-MX', { timeZone: 'America/Mexico_City' });
+                const hora = new Date().toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour12: false });
+                response.data.infoChecker.update = fecha + " " + hora;
+                this.checkerStore.infoChecker(response.data.infoChecker);
+                this.collaboratorsStore.infoStorage(response.data.data);
             } catch (error) {
-
+                this.error.action = "Get Colaboradores";
+                this.error.status = error.status;
+                this.error.message = error.message;
+                this.error.method = error.config?.method;
+                this.logsStore.add(this.error);
             }
         }
     },

@@ -24,9 +24,11 @@
                         <v-tab value="2">
                             <v-icon icon="users"></v-icon>
                             <br>
-                            Colaboradores ({{ lengthCollaborators }})</v-tab>
-                        <v-tab value="3"> <v-icon icon="list"></v-icon>
-                            <br>Registros locales</v-tab>
+                            {{ `Colaboradores (${lengthCollaborators})` }}</v-tab>
+                        <v-tab value="3">
+                            <v-icon icon="list"></v-icon>
+                            <br>
+                            {{ `Registros locales (${lengthRegisters})` }}</v-tab>
                         <v-tab value="4">
                             <v-icon icon="triangle-exclamation"></v-icon>
                             <br>Logs</v-tab>
@@ -68,13 +70,16 @@ export default {
     data() {
         return {
             infoCollaborators: JSON.parse(localStorage.collaborators),
+            infoRegisters: localStorage.registers ? JSON.parse(localStorage.registers) : [],
             lengthCollaborators: null,
+            lengthRegisters: null,
             tab: null,
             dialog: false,
         }
     },
     created() {
         this.lengthCollaborators = this.infoCollaborators.infoCollaborators.length;
+        this.lengthRegisters = this.infoRegisters.length != 0 ? this.infoRegisters.registers.length : 0;
     },
 }
 </script>

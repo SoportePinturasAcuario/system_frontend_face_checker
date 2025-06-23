@@ -1,5 +1,7 @@
 <script>
 import { useCollaboratorsStore } from '@/stores/collaborators';
+import { useRegistersStore } from '@/stores/registers';
+import { useLogsStore } from '@/stores/logs';
 import * as faceapi from 'face-api.js';
 export default {
     data() {
@@ -15,8 +17,10 @@ export default {
                 event_id: null,
                 type_event_id: null,
                 img: null,
+                time: null,
             },
             setting: {
+                statusRegisters: false,
                 event_active: [],
                 status_event_active: true,
                 type_event_active: [],
@@ -30,7 +34,8 @@ export default {
                     value: 0,
                     count: 5,
                 }
-            }
+            },
+            error: {},
         }
     },
     created() {
@@ -50,6 +55,11 @@ export default {
         this.data.collaborators = Float32ArrayCollaborators;
         this.data.infoCollaborators = collaborators;
     },
+    setup() {
+        const registersStore = useRegistersStore();
+        const logsStore = useLogsStore();
+        return { registersStore, logsStore };
+    },
     methods: {
         async eventSelection(event) {
             try {
@@ -67,15 +77,27 @@ export default {
                 this.setting.status_type_event_active = false;
                 this.setting.status_event_active = true;
                 this.setting.status_scanner = false;
-                this.setting.name_collaborator = null;
+                this.setting.statusRegisters = false;
                 this.setting.status_detections = false;
+                this.setting.name_collaborator = null;
+                this.setting.time.value = 0;
+                this.setting.time.count = 5;
+                clearInterval(this.setting.time.interval);
                 video.play();
             } catch (error) {
-                console.error('Error al seleccionar el tipo de evento', error);
+                this.error.action = "Error al seleccionar el tipo de evento";
+                this.error.status = error.status;
+                this.error.message = error.message;
+                this.error.method = error.config?.method;
+                this.logsStore.add(this.error);
             }
         },
         async validCollaborator(data) {
             try {
+                this.setting.type_event_active = data;
+                this.setting.status_type_event_active = false;
+                this.setting.time.value = 0;
+                this.setting.time.count = 5;
                 video.pause();
 
                 // Librerias de faceapi
@@ -93,7 +115,9 @@ export default {
                 }
                 // Buscara en la imagen de etiqueta video pausado un descriptor  
                 let detections;
+                let v = 0;
                 while (this.setting.status_detections != true) {
+                    console.log(v)
                     detections = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
                     if (detections != undefined) {
                         video.pause();
@@ -101,30 +125,37 @@ export default {
                         this.setting.status_detections = true;
                         break;
                     }
+                    if (v === 50)
+                    // Si respues de 100 intentos no reconoce a un colaborador se resetea
+                    {
+                        this.refresh();
+                        break;
+                    }
+                    v++;
                     video.play();
                 }
 
                 const dataBios = new faceapi.FaceMatcher(this.data.collaborators);
                 const result = dataBios.findBestMatch(detections.descriptor);
                 // se cambian estados de configuraciones
-                this.setting.type_event_active = data;
-                this.setting.status_type_event_active = false;
                 this.setting.status_scanner = true;
                 this.setting.name_collaborator = result.label;
                 // En espera de 5s para al confirmacion o negacion
                 this.setting.time.interval = setInterval(() => {
-                    this.setting.time.value += 20
-                    this.setting.time.count--;
                     if (this.setting.time.value === 100) {
                         clearInterval(this.setting.time.interval);
                         this.refresh();
-                        this.setting.time.value = 0;
-                        this.setting.time.count = 5;
 
                     }
+                    this.setting.time.value += 20
+                    this.setting.time.count--;
                 }, 1000)
             } catch (error) {
-                console.error('Error no se pudo escanear', error);
+                this.error.action = "Escaner";
+                this.error.status = error.status;
+                this.error.message = error.message;
+                this.error.method = error.config?.method;
+                this.logsStore.add(this.error);
             }
         },
         async capture() {
@@ -136,27 +167,63 @@ export default {
                 ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
                 this.data.imgData = img.toDataURL('image/png')
             } catch (error) {
-                console.error('Error No fue posible capturar la imagen', error);
+                this.error.action = "Error no fue posible capturar la imagen";
+                this.error.status = error.status;
+                this.error.message = error.message;
+                this.error.method = error.config?.method;
+                this.logsStore.add(this.error);
             }
         },
+        async saveRegister() {
+            try {
+                const fecha = new Date().toLocaleString('sv-SE', { timeZone: 'America/Mexico_City' }).slice(0, 10);
+                const hora = new Date().toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour12: false });
+                const name_collaborator = this.setting.name_collaborator;
+                const data = this.data.infoCollaborators.find(collaborator => collaborator.name === name_collaborator);
+                this.layout.collaborator_id = data.id;
+                this.layout.event_id = this.setting.event_active.id;
+                this.layout.type_event_id = this.setting.type_event_active.id;
+                this.layout.time = fecha + " " + hora;
+                if (this.setting.internet) {
+                    console.log("Envia la imagen y se envia el registro a la base de datos");
+                    this.layout.img = this.data.imgData;
+                } else {
+                    this.registersStore.add(this.layout);
+                    console.log("No envia imagen y se resguarda en el localStorage");
+                }
+                this.setting.statusRegisters = true;
+                clearInterval(this.setting.time.interval);
+            } catch (error) {
+                this.error.action = "Guardar registro";
+                this.error.status = error.status;
+                this.error.message = error.message;
+                this.error.method = error.config?.method;
+                this.logsStore.add(this.error);
+            } finally {
+                this.setting.status_scanner = false;
+                setTimeout(() => {
+                    this.layout = {};
+                    this.refresh();
+                }, 1000);
+            }
+        }
     },
 }
 </script>
 <template>
     <div class="position-absolute w-100 bottom-0 left-0">
-        <v-footer class="bg-blue-grey-darken-2"
-            :height="$vuetify.display.height < 960 ? $vuetify.display.height * .3 : $vuetify.display.height * .4">
-            <v-row>
+        <v-footer class="bg-blue-lighten-4" height="auto">
+            <v-row class="ma-1">
                 <!-- Texto -->
                 <v-col cols="6">
-                    <v-card color="black">
+                    <v-card>
                         <v-card-text>
-                            <v-list bg-color="black">
+                            <v-list>
                                 <v-list-item>
                                     <template v-slot:prepend>
-                                        <v-icon
+                                        <v-icon size="30"
                                             :icon="setting.status_event_active === false ? setting.event_active.icon : 'info-circle'"
-                                            :color="setting.status_event_active === false ? setting.event_active.color : 'white'"></v-icon>
+                                            :color="setting.status_event_active === false ? setting.event_active.color : 'black'"></v-icon>
                                     </template>
                                     <template v-slot:title>
                                         Evento
@@ -168,9 +235,9 @@ export default {
                                 </v-list-item>
                                 <v-list-item>
                                     <template v-slot:prepend>
-                                        <v-icon
-                                            :icon="setting.status_type_event_active === true && setting.status_event_active === true ? setting.type_event_active.icon : 'info-circle'"
-                                            :color="setting.status_type_event_active === true ? setting.type_event_active.color : 'white'"></v-icon>
+                                        <v-icon size="30"
+                                            :icon="setting.type_event_active.length === 0 ? 'info-circle' : setting.type_event_active.icon"
+                                            :color="setting.type_event_active.length === 0 ? 'black' : 'green'"></v-icon>
                                     </template>
                                     <template v-slot:title>
                                         Tipo de Evento
@@ -181,7 +248,8 @@ export default {
                                 </v-list-item>
                                 <v-list-item>
                                     <template v-slot:prepend>
-                                        <v-icon icon="user"></v-icon>
+                                        <v-icon size="30" icon="user"
+                                            :color="setting.name_collaborator != null ? 'green' : 'black'"></v-icon>
                                     </template>
                                     <template v-slot:title>Colaborador</template>
                                     <template v-if="setting.name_collaborator != null" v-slot:subtitle>{{
@@ -195,28 +263,33 @@ export default {
                 <v-col cols="6" class="d-flex justify-center align-center">
                     <v-row v-if="setting.status_scanner === false">
                         <!-- Botones de eventos-->
-                        <v-col cols="12" v-if="setting.status_event_active" v-for="event in data.events" key="id">
-                            <v-btn class="text-white" :color="event.color" block @click="eventSelection(event)"
-                                :prepend-icon="event.icon">
+                        <v-col cols="6" v-if="setting.status_event_active" v-for="event in data.events" key="id">
+                            <v-btn class="text-white" :color="event.color" @click="eventSelection(event)"
+                                :prepend-icon="event.icon" stacked style="width: 100%;">
                                 <!-- <v-icon :icon="event.icon" class="my-1"></v-icon> -->
                                 <p class="text-center">{{ event.name }}</p>
                             </v-btn>
                         </v-col>
                         <!--  -->
                         <!-- Botones de tipos de eventos-->
-                        <v-col cols="12" v-if="setting.status_type_event_active"
+                        <v-col cols="6" v-if="setting.status_type_event_active"
                             v-for="type in setting.event_active.types_registers" key="id">
-                            <v-btn class="text-white" :color="type.color" block @click="validCollaborator(type)"
-                                :prepend-icon="type.icon">
+                            <v-btn class="text-white" :color="type.color" @click="validCollaborator(type)"
+                                :prepend-icon="type.icon" stacked style="width: 100%;">
                                 <!-- <v-icon :icon="type.icon"></v-icon> -->
                                 <p class="text-center">{{ type.name }}</p>
                             </v-btn>
                         </v-col>
                         <v-col cols="12" v-if="setting.status_type_event_active">
-                            <v-btn class="text-white" color="grey" block @click="refresh()" prepend-icon="angles-left">
+                            <v-btn class="text-white" color="grey" @click="refresh()" prepend-icon="angles-left" stacked
+                                style="width: 100%;">
                                 <!-- <v-icon icon="angles-left"></v-icon> -->
                                 <p> Regresar</p>
                             </v-btn>
+                        </v-col>
+                        <v-col cols="12" v-if="!setting.status_event_active && !setting.status_type_event_active" class="d-flex align-center justify-center">
+                            <v-progress-circular color="primary" indeterminate :size="82"
+                                :width="12"></v-progress-circular>
                         </v-col>
                         <!--  -->
                     </v-row>
@@ -233,9 +306,17 @@ export default {
                             </v-progress-circular>
                         </v-col>
                         <v-col cols="4">
-                            <v-btn color="green" stacked block>
+                            <v-btn color="green" stacked block @click="saveRegister()">
                                 <p class="text-center">Si</p>
                             </v-btn>
+                        </v-col>
+                    </v-row>
+                    <v-row v-if="setting.name_collaborator != null && setting.statusRegisters === true">
+                        <v-col cols="12">
+                            <p>{{ layout.time }}</p>
+                        </v-col>
+                        <v-col cols="12">
+                            <p>Registro enviado</p>
                         </v-col>
                     </v-row>
                 </v-col>

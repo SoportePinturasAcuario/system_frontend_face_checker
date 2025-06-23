@@ -1,7 +1,7 @@
 <script>
 import { useCollaboratorsStore } from '@/stores/collaborators';
 import { useCheckerStore } from '@/stores/configChecker';
-import * as faceapi from 'face-api.js';
+import { useEventstore } from '@/stores/events';
 export default {
     data() {
         return {
@@ -21,11 +21,13 @@ export default {
     },
     created() {
         this.getCheckers();
+        this.getEvents();
     },
     setup() {
         const collaboratorsStore = useCollaboratorsStore();
         const checkerStore = useCheckerStore();
-        return { collaboratorsStore, checkerStore };
+        const EventsStore = useEventstore();
+        return { collaboratorsStore, checkerStore, EventsStore };
     },
     methods: {
         async getCheckers() {
@@ -36,6 +38,50 @@ export default {
                 this.settings.loadingCheckers = true;
             } catch (error) {
                 console.log(error);
+            }
+        },
+        async getEvents() {
+            try {
+                const response = await axios.get(import.meta.env.VITE_BACKEND_CHECKER_URL + 'checkers/events');
+                const data = response.data.data;
+                data.forEach(element => {
+                    switch (element.id) {
+                        case 1:
+                            element.icon = 'helmet-safety';
+                            break;
+                        case 2:
+                            element.icon = 'utensils';
+                            break;
+                        case 3:
+                            element.icon = 'stopwatch';
+                            break;
+                    }
+                    element.types_registers.forEach(type => {
+                        switch (type.id) {
+                            case 1:
+                                type.icon = 'angles-up';
+                                break;
+                            case 2:
+                                type.icon = 'angles-down';
+                                break;
+                            case 3:
+                                type.icon = 'angles-up';
+                                break;
+                            case 4:
+                                type.icon = 'angles-down';
+                                break;
+                            case 5:
+                                type.icon = 'angles-up';
+                                break;
+                            case 6:
+                                type.icon = 'angles-down';
+                                break;
+                        }
+                    });
+                })
+                this.EventsStore.infoEvents(data);
+            } catch (error) {
+                console.error('No es posible descargar o actualizar los eventos', error);
             }
         },
         async valid(event) {
@@ -66,7 +112,7 @@ export default {
                     this.settings.alert = { status: false, message: null };
                 }, 5000);
             }
-        }
+        },
     },
 }
 </script>

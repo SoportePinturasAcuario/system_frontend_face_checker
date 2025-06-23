@@ -1,86 +1,48 @@
 <script>
 import Menu from '../components/Menu.vue';
 import FooterScanner from '../components/FooterScanner.vue'
-import { useEventstore } from '@/stores/events';
+import { useLogsStore } from '@/stores/logs';
+import { useRegistersStore } from '@/stores/registers';
 export default {
     components: { Menu, FooterScanner },
     data() {
         return {
             internet: navigator.onLine,
+            statusCamara: true,
         }
     },
     // El mounted se ejecuta despues de que los componentes se cargan
     mounted() {
-        const video = document.getElementById('video');
-        this.startCamara(video);
-        this.getEvents();
+        this.startCamara();
     },
     setup() {
-        const EventsStore = useEventstore();
-        return { EventsStore };
+        const LogsStore = useLogsStore();
+        const RegistersStore = useRegistersStore();
+        return { LogsStore, RegistersStore };
     },
     methods: {
-        async startCamara(video) {
+        async startCamara() {
             try {
+                const video = document.getElementById('video');
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
             } catch (err) {
+                this.statusCamara = false;
+                console.log(err);
                 console.error('Error al acceder a la cámara:', err);
+            } finally {
+                console.log(this.statusCamara);
             }
         },
         async updateInternet() {
             this.internet = navigator.onLine;
-        },
-        async getEvents() {
-            try {
-                const response = await axios.get(import.meta.env.VITE_BACKEND_CHECKER_URL + 'checkers/events');
-                const data = response.data.data;
-                data.forEach(element => {
-                    switch (element.id) {
-                        case 1:
-                            element.icon = 'helmet-safety';
-                            break;
-                        case 2:
-                            element.icon = 'utensils';
-                            break;
-                        case 3:
-                            element.icon = 'stopwatch';
-                            break;
-                    }
-                    element.types_registers.forEach(type => {
-                        switch (type.id) {
-                            case 1:
-                                type.icon = 'angles-up';
-                                break;
-                            case 2:
-                                type.icon = 'angles-down';
-                                break;
-                            case 3:
-                                type.icon = 'angles-up';
-                                break;
-                            case 4:
-                                type.icon = 'angles-down';
-                                break;
-                            case 5:
-                                type.icon = 'angles-up';
-                                break;
-                            case 6:
-                                type.icon = 'angles-down';
-                                break;
-                        }
-                    });
-                })
-                this.EventsStore.infoEvents(data);
-            } catch (error) {
-                console.error('No es posible descargar o actualizar los eventos', error);
-            }
         },
     }
 }
 </script>
 <template>
     <v-card class="h-100" elevation="0">
-        <v-card-title class="bg-blue-darken-3">
+        <v-card-title class="bg-blue-darken-3" v-if="statusCamara">
             <v-row>
                 <v-col class="d-flex justify-start align-center">
                     <Menu></Menu>
@@ -91,14 +53,23 @@ export default {
                 </v-col>
             </v-row>
         </v-card-title>
-        <v-card-text class="py-0">
+        <v-card-title v-else>
+            <v-alert border="start" title="Error al acceder a la camara" type="error" variant="outlined"
+                style="white-space: normal; word-break: break-word;">
+                No a sido posible acceder a la cámara, para poder habilidad la cámara dirígete a la configuración
+                del navegador en la sección de sitios y habilita en los permisos la cámara para esta página.
+                <v-progress-linear color="blue-darken-3" indeterminate class="my-4"></v-progress-linear>
+            </v-alert>
+        </v-card-title>
+        <v-card-text class="py-0" v-if="statusCamara">
             <div>
                 <canvas id="capturaImg"></canvas>
                 <video id="video" class="my-a" autoplay muted></video>
             </div>
         </v-card-text>
-        <FooterScanner></FooterScanner>
+        <FooterScanner v-if="statusCamara"></FooterScanner>
     </v-card>
+
 </template>
 <style>
 video {
