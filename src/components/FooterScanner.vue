@@ -8,6 +8,7 @@ export default {
         return {
             data: {
                 events: JSON.parse(localStorage.events),
+                checker: JSON.parse(localStorage.checker).info,
                 collaborators: [],
                 infoCollaborators: [],
                 imgData: [],
@@ -162,10 +163,13 @@ export default {
             try {
                 const img = document.getElementById('capturaImg');
                 const ctx = img.getContext('2d');
-                img.width = '480';
-                img.height = '640';
+                img.width = '640';
+                img.height = '480';
                 ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-                this.data.imgData = img.toDataURL('image/png')
+                const dataURL = img.toDataURL('image/png')
+                const base64Data = dataURL.replace(/^data:image\/png;base64,/, '');
+                this.data.imgData = base64Data;;
+
             } catch (error) {
                 this.error.action = "Error no fue posible capturar la imagen";
                 this.error.status = error.status;
@@ -183,10 +187,11 @@ export default {
                 this.layout.collaborator_id = data.id;
                 this.layout.event_id = this.setting.event_active.id;
                 this.layout.type_event_id = this.setting.type_event_active.id;
+                this.layout.checker_id = this.data.checker.id;
                 this.layout.time = fecha + " " + hora;
                 if (this.setting.internet) {
-                    console.log("Envia la imagen y se envia el registro a la base de datos");
                     this.layout.img = this.data.imgData;
+                    const response = await axios.post(import.meta.env.VITE_BACKEND_CHECKER_URL + 'registers', this.layout);
                 } else {
                     this.registersStore.add(this.layout);
                     console.log("No envia imagen y se resguarda en el localStorage");
@@ -254,7 +259,7 @@ export default {
                                     <template v-slot:title>Colaborador</template>
                                     <template v-if="setting.name_collaborator != null" v-slot:subtitle>{{
                                         setting.name_collaborator
-                                    }}</template>
+                                        }}</template>
                                 </v-list-item>
                             </v-list>
                         </v-card-text>
@@ -287,7 +292,8 @@ export default {
                                 <p> Regresar</p>
                             </v-btn>
                         </v-col>
-                        <v-col cols="12" v-if="!setting.status_event_active && !setting.status_type_event_active" class="d-flex align-center justify-center">
+                        <v-col cols="12" v-if="!setting.status_event_active && !setting.status_type_event_active"
+                            class="d-flex align-center justify-center">
                             <v-progress-circular color="primary" indeterminate :size="82"
                                 :width="12"></v-progress-circular>
                         </v-col>

@@ -59,7 +59,7 @@ export default {
     methods: {
         async sendDAta() {
             try {
-                const response = await axios.post(import.meta.env.VITE_BACKEND_CHECKER_URL + 'registers/storage', this.data.registers);
+                const response = await axios.post(import.meta.env.VITE_BACKEND_CHECKER_URL + 'checkers/valid', this.data.registers);
                 this.registersStore.delete();
                 this.data.registers = [];
             } catch (error) {
