@@ -12,7 +12,6 @@ export default {
                 { title: 'Time', value: 'hour', align: 'center' },
             ],
             data: {
-                logs: [],
                 logsStor: localStorage.logs ? JSON.parse(localStorage.logs).logs : [],
             },
             setting: {
@@ -28,7 +27,6 @@ export default {
     mounted() {
         if (this.data.logsStor.length != 0) {
             this.setting.logsStatus = false;
-            this.data.logs = this.data.logsStor;
         } else {
             this.setting.logsStatus = true;
         }
@@ -37,8 +35,8 @@ export default {
         async deleteStore() {
             try {
                 this.logsStore.delete();
-                this.data.logs = this.data.logsStor;
-                this.setting.true;
+                this.data.logsStor = localStorage.logs ? JSON.parse(localStorage.logs).logs : [];
+                this.setting.logsStatus = true;
             } catch (error) {
                 this.error.action = "Delete logs";
                 this.error.status = error.status;
@@ -46,7 +44,7 @@ export default {
                 this.error.method = error.config?.method;
                 this.logsStore.add(this.error);
             }
-        }
+        },
     },
 }
 </script>

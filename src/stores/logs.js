@@ -11,7 +11,8 @@ export const useLogsStore = defineStore("logs", {
             this.logs.push(data);
         },
         async delete() {
-            this.logs = [];
+             this.logs = [];
+             localStorage.removeItem("logs");
         }
     },
     persist: true,

@@ -21,6 +21,7 @@ export default {
                 time: null,
             },
             setting: {
+                loading: false,
                 statusRegisters: false,
                 event_active: [],
                 status_event_active: true,
@@ -43,18 +44,29 @@ export default {
         this.data.events = this.data.events.info;
     },
     mounted() {
-        const collaboratorsStore = useCollaboratorsStore();
-        const collaborators = collaboratorsStore.infoCollaborators;
-        // Crea el archivo en el criterio que se requiere para el scanner facial
-        const Float32ArrayCollaborators = collaborators.map(person => {
-            const label = person.name || 'ID-${person.descriptors[0].id}';
-            const descriptors = person.descriptors.map(d =>
-                new Float32Array(JSON.parse(d.descriptor))
-            );
-            return new faceapi.LabeledFaceDescriptors(label, descriptors);
-        })
-        this.data.collaborators = Float32ArrayCollaborators;
-        this.data.infoCollaborators = collaborators;
+        try {
+            this.setting.loading = true;
+            const collaboratorsStore = useCollaboratorsStore();
+            const collaborators = collaboratorsStore.infoCollaborators;
+            // Crea el archivo en el criterio que se requiere para el scanner facial
+            const Float32ArrayCollaborators = collaborators.map(person => {
+                const label = person.name || 'ID-${person.descriptors[0].id}';
+                const descriptors = person.descriptors.map(d =>
+                    new Float32Array(JSON.parse(d.descriptor))
+                );
+                return new faceapi.LabeledFaceDescriptors(label, descriptors);
+            })
+            this.data.collaborators = Float32ArrayCollaborators;
+            this.data.infoCollaborators = collaborators;
+        } catch (error) {
+            this.error.action = "Error al cargar";
+            this.error.status = error.status;
+            this.error.message = error.message;
+            this.error.method = error.config?.method;
+            this.logsStore.add(this.error);
+        } finally {
+            this.setting.loading = false;
+        }
     },
     setup() {
         const registersStore = useRegistersStore();
@@ -68,11 +80,16 @@ export default {
                 this.setting.event_active = event;
                 this.setting.status_type_event_active = true;
             } catch (error) {
-                console.error('Error al seleccionar el evento', error);
+                this.error.action = "Error al seleccionar el tipo de evento";
+                this.error.status = error.status;
+                this.error.message = error.message;
+                this.error.method = error.config?.method;
+                this.logsStore.add(this.error);
             }
         },
         async refresh() {
             try {
+                this.setting.loading = true;
                 this.setting.type_event_active = [];
                 this.setting.event_active = [];
                 this.setting.status_type_event_active = false;
@@ -91,12 +108,15 @@ export default {
                 this.error.message = error.message;
                 this.error.method = error.config?.method;
                 this.logsStore.add(this.error);
+            } finally {
+                this.setting.loading = false;
             }
         },
         async validCollaborator(data) {
             try {
-                this.setting.type_event_active = data;
+                this.setting.loading = true;
                 this.setting.status_type_event_active = false;
+                this.setting.type_event_active = data;
                 this.setting.time.value = 0;
                 this.setting.time.count = 5;
                 video.pause();
@@ -157,6 +177,8 @@ export default {
                 this.error.message = error.message;
                 this.error.method = error.config?.method;
                 this.logsStore.add(this.error);
+            } finally {
+                this.setting.loading = false;
             }
         },
         async capture() {
@@ -180,36 +202,37 @@ export default {
         },
         async saveRegister() {
             try {
+                this.setting.loading = true;
+                const name_collaborator = this.setting.name_collaborator;
                 const fecha = new Date().toLocaleString('sv-SE', { timeZone: 'America/Mexico_City' }).slice(0, 10);
                 const hora = new Date().toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour12: false });
-                const name_collaborator = this.setting.name_collaborator;
                 const data = this.data.infoCollaborators.find(collaborator => collaborator.name === name_collaborator);
                 this.layout.collaborator_id = data.id;
                 this.layout.event_id = this.setting.event_active.id;
                 this.layout.type_event_id = this.setting.type_event_active.id;
                 this.layout.checker_id = this.data.checker.id;
                 this.layout.time = fecha + " " + hora;
+                this.setting.statusRegisters = true;
                 if (this.setting.internet) {
                     this.layout.img = this.data.imgData;
                     const response = await axios.post(import.meta.env.VITE_BACKEND_CHECKER_URL + 'registers', this.layout);
-                } else {
-                    this.registersStore.add(this.layout);
-                    console.log("No envia imagen y se resguarda en el localStorage");
                 }
-                this.setting.statusRegisters = true;
                 clearInterval(this.setting.time.interval);
             } catch (error) {
                 this.error.action = "Guardar registro";
                 this.error.status = error.status;
                 this.error.message = error.message;
                 this.error.method = error.config?.method;
+                delete this.layout.img;
+                this.registersStore.add(this.layout);
                 this.logsStore.add(this.error);
             } finally {
                 this.setting.status_scanner = false;
+                this.setting.loading = false;
                 setTimeout(() => {
                     this.layout = {};
                     this.refresh();
-                }, 1000);
+                }, 2000);
             }
         }
     },
@@ -259,13 +282,13 @@ export default {
                                     <template v-slot:title>Colaborador</template>
                                     <template v-if="setting.name_collaborator != null" v-slot:subtitle>{{
                                         setting.name_collaborator
-                                        }}</template>
+                                    }}</template>
                                 </v-list-item>
                             </v-list>
                         </v-card-text>
                     </v-card>
                 </v-col>
-                <v-col cols="6" class="d-flex justify-center align-center">
+                <v-col v-if="!setting.loading" cols="6" class="d-flex justify-center align-center">
                     <v-row v-if="setting.status_scanner === false">
                         <!-- Botones de eventos-->
                         <v-col cols="6" v-if="setting.status_event_active" v-for="event in data.events" key="id">
@@ -275,7 +298,6 @@ export default {
                                 <p class="text-center">{{ event.name }}</p>
                             </v-btn>
                         </v-col>
-                        <!--  -->
                         <!-- Botones de tipos de eventos-->
                         <v-col cols="6" v-if="setting.status_type_event_active"
                             v-for="type in setting.event_active.types_registers" key="id">
@@ -291,11 +313,6 @@ export default {
                                 <!-- <v-icon icon="angles-left"></v-icon> -->
                                 <p> Regresar</p>
                             </v-btn>
-                        </v-col>
-                        <v-col cols="12" v-if="!setting.status_event_active && !setting.status_type_event_active"
-                            class="d-flex align-center justify-center">
-                            <v-progress-circular color="primary" indeterminate :size="82"
-                                :width="12"></v-progress-circular>
                         </v-col>
                         <!--  -->
                     </v-row>
@@ -325,6 +342,9 @@ export default {
                             <p>Registro enviado</p>
                         </v-col>
                     </v-row>
+                </v-col>
+                <v-col v-if="setting.loading" cols="6" class="d-flex align-center justify-center">
+                    <v-progress-circular color="primary" indeterminate :size="82" :width="12"></v-progress-circular>
                 </v-col>
             </v-row>
         </v-footer>

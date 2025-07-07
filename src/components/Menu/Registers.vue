@@ -6,7 +6,7 @@ export default {
         return {
             data: {
                 registers: [],
-                registersStore: localStorage.registers ? JSON.parse(localStorage.registers) : [],
+                registersStore: localStorage.registers ? JSON.parse(localStorage.registers).registers : [],
                 collaboratorsStore: JSON.parse(localStorage.collaborators),
                 eventsStore: JSON.parse(localStorage.events),
             },
@@ -23,33 +23,7 @@ export default {
         }
     },
     mounted() {
-        if (this.data.registersStore.length != 0) {
-            this.setting.registersStatus = false;
-            this.data.registersStore.registers.forEach(element => {
-                const collaborator = this.data.collaboratorsStore.infoCollaborators.find(collaboratorElement => {
-                    if (collaboratorElement.id === element.collaborator_id) {
-                        return collaboratorElement.name;
-                    }
-                });
-                const event = this.data.eventsStore.info.find(event => {
-                    if (event.id === element.event_id) {
-                        return event
-                    }
-                });
-                element.collaborator_name = collaborator.name;
-                element.event = { "id": event.id, "color": event.color, "name": event.name };
-
-                const type = event.types_registers.find(types_registers => {
-                    if (element.event_id === types_registers.event_id && element.type_event_id === types_registers.id) {
-                        return types_registers
-                    }
-                })
-                element.type_events = { "id": type.id, "event_id": type.event_id, "name": type.name, "color": type.color };
-            });
-            this.data.registers = this.data.registersStore.registers;
-        } else {
-            this.setting.registersStatus = true;
-        }
+        this.formData(this.data.registersStore.length);
     },
     setup() {
         const registersStore = useRegistersStore();
@@ -57,12 +31,44 @@ export default {
         return { registersStore, logsStore };
     },
     methods: {
+        async formData(info) {
+            if (info != 0) {
+                this.setting.registersStatus = false;
+                this.data.registersStore.forEach(element => {
+                    const collaborator = this.data.collaboratorsStore.infoCollaborators.find(collaboratorElement => {
+                        if (collaboratorElement.id === element.collaborator_id) {
+                            return collaboratorElement.name;
+                        }
+                    });
+                    const event = this.data.eventsStore.info.find(event => {
+                        if (event.id === element.event_id) {
+                            return event
+                        }
+                    });
+                    element.collaborator_name = collaborator.name;
+                    element.event = { "id": event.id, "color": event.color, "name": event.name };
+
+                    const type = event.types_registers.find(types_registers => {
+                        if (element.event_id === types_registers.event_id && element.type_event_id === types_registers.id) {
+                            return types_registers
+                        }
+                    })
+                    element.type_events = { "id": type.id, "event_id": type.event_id, "name": type.name, "color": type.color };
+                });
+                this.data.registers = this.data.registersStore;
+            } else {
+                this.setting.registersStatus = true;
+            }
+        },
         async sendDAta() {
             try {
-                const response = await axios.post(import.meta.env.VITE_BACKEND_CHECKER_URL + 'checkers/valid', this.data.registers);
+                const registers = { 'list': this.data.registers };
+                const response = await axios.post(import.meta.env.VITE_BACKEND_CHECKER_URL + 'registers/massive', registers);
                 this.registersStore.delete();
-                this.data.registers = [];
+                this.data.registers = localStorage.registers ? this.formData(JSON.parse(localStorage.registers).registers) : [];
+                this.setting.registersStatus = true;
             } catch (error) {
+                console.log(error);
                 this.error.action = "POST Colaboradores";
                 this.error.status = error.status;
                 this.error.message = error.message;

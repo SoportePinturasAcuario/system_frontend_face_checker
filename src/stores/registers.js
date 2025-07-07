@@ -7,7 +7,8 @@ export const useRegistersStore = defineStore("registers", {
             this.registers.push(data);
         },
         async delete() {
-            this.registers = [];
+             this.registers = [];
+             localStorage.removeItem("registers");
         }
     },
     persist: true,
